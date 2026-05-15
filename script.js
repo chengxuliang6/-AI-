@@ -43,6 +43,9 @@ const levels = [
   { time: 120, balls: 56, speed: 30, spawn: 0.62 },
 ];
 
+const BALL_SPACING = 34;
+const MATCH_GAP = 40;
+
 const pathPoints = [
   [112, 500],
   [250, 610],
@@ -126,9 +129,12 @@ function createState(levelIndex = 0) {
     totalTime: level.time,
     balls,
     shots: [],
+    floaters: [],
     shooter: { x: 640, y: 392 },
-    currentColor: Math.floor(Math.random() * basePalette.length),
-    nextColor: Math.floor(Math.random() * basePalette.length),
+    currentColor: randomColorInBalls(balls),
+    nextColor: randomColorInBalls(balls),
+    chainBonus: 0,
+    maxCombo: 0,
     paused: false,
     timerFrozen: 0,
     rewindActive: 0,
@@ -136,6 +142,19 @@ function createState(levelIndex = 0) {
     won: false,
     lost: false,
   };
+}
+
+function randomColorInBalls(balls = state?.balls || []) {
+  const colors = [...new Set(balls.map((ball) => ball.colorIndex))];
+  if (!colors.length) return Math.floor(Math.random() * basePalette.length);
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+function keepShooterColorsInChain() {
+  const colors = new Set(state.balls.map((ball) => ball.colorIndex));
+  if (!colors.size) return;
+  if (!colors.has(state.currentColor)) state.currentColor = randomColorInBalls();
+  if (!colors.has(state.nextColor)) state.nextColor = randomColorInBalls();
 }
 
 function randomSkill(chance) {
@@ -171,6 +190,19 @@ function findPathHitCandidates(x, y, maxGap = 18) {
 function hasBallNearPathDistance(distance, range = 58) {
   if (state.balls.length === 0) return true;
   return state.balls.some((ball) => Math.abs(ball.distance - distance) <= range);
+}
+
+function findNearestBallIndexByPathDistance(distance, range = 58) {
+  let bestIndex = -1;
+  let bestGap = Infinity;
+  state.balls.forEach((ball, index) => {
+    const gap = Math.abs(ball.distance - distance);
+    if (gap <= range && gap < bestGap) {
+      bestGap = gap;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
 }
 
 function hasSkippedTrack(shot, distance) {
@@ -364,6 +396,21 @@ function drawShots() {
   state.shots.forEach((shot) => drawBall(shot.x, shot.y, 14, basePalette[shot.colorIndex].color));
 }
 
+function drawFloaters() {
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.font = "800 22px Microsoft YaHei, Segoe UI, Arial";
+  state.floaters.forEach((floater) => {
+    ctx.globalAlpha = clamp(floater.life / 1.2, 0, 1);
+    ctx.fillStyle = "rgba(4, 18, 20, 0.75)";
+    ctx.fillText(floater.text, floater.x + 2, floater.y + 2);
+    ctx.fillStyle = rgbString(basePalette[floater.colorIndex]?.color || [255, 255, 255]);
+    ctx.fillText(floater.text, floater.x, floater.y);
+  });
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
 function drawChain() {
   const ordered = [...state.balls].sort((a, b) => b.distance - a.distance);
   ordered.forEach((ball) => {
@@ -392,6 +439,7 @@ function draw() {
   drawAim();
   drawChain();
   drawShots();
+  drawFloaters();
   drawShooter();
 }
 
@@ -416,6 +464,11 @@ function update(delta) {
   if (state.timerFrozen > 0) state.timerFrozen -= delta;
   else state.timeLeft -= delta;
   if (state.rewindActive > 0) state.rewindActive -= delta;
+  state.floaters.forEach((floater) => {
+    floater.y -= 28 * delta;
+    floater.life -= delta;
+  });
+  state.floaters = state.floaters.filter((floater) => floater.life > 0);
 
   state.shots.forEach((shot) => {
     shot.x += shot.vx * delta;
@@ -438,8 +491,7 @@ function handleShotCollisions() {
       return Math.hypot(point.x - shot.x, point.y - shot.y) < 28;
     });
     if (hitIndex !== -1) {
-      const hitBall = state.balls[hitIndex];
-      insertShotAtDistance(shot, hitBall.distance + 17);
+      insertShotNearBall(shot, hitIndex);
       continue;
     }
 
@@ -447,13 +499,32 @@ function handleShotCollisions() {
     const candidates = findPathHitCandidates(shot.x, shot.y);
     for (const candidate of candidates) {
       if (hasSkippedTrack(shot, candidate.d)) continue;
-      if (hasBallNearPathDistance(candidate.d)) {
+      const nearBallIndex = findNearestBallIndexByPathDistance(candidate.d);
+      if (nearBallIndex !== -1) {
+        insertShotNearBall(shot, nearBallIndex);
+        break;
+      }
+      if (state.balls.length === 0 || hasBallNearPathDistance(candidate.d)) {
         insertShotAtDistance(shot, candidate.d);
         break;
       }
       shot.skippedTracks.push(candidate.d);
     }
   }
+}
+
+function insertShotNearBall(shot, ballIndex) {
+  const ball = state.balls[ballIndex];
+  const insertDistance = chooseInsertDistance(shot, ball);
+  insertShotAtDistance(shot, insertDistance);
+}
+
+function chooseInsertDistance(shot, ball) {
+  const behind = samplePath(ball.distance - BALL_SPACING);
+  const ahead = samplePath(ball.distance + BALL_SPACING);
+  const behindGap = Math.hypot(behind.x - shot.x, behind.y - shot.y);
+  const aheadGap = Math.hypot(ahead.x - shot.x, ahead.y - shot.y);
+  return aheadGap < behindGap ? ball.distance + BALL_SPACING * 0.52 : ball.distance - BALL_SPACING * 0.52;
 }
 
 function insertShotAtDistance(shot, distance) {
@@ -469,43 +540,67 @@ function insertShotAtDistance(shot, distance) {
   normalizeChain();
   const insertedIndex = state.balls.indexOf(insertedBall);
   resolveMatches(Math.max(0, insertedIndex));
+  keepShooterColorsInChain();
 }
 
 function normalizeChain() {
   state.balls.sort((a, b) => a.distance - b.distance);
   for (let i = 1; i < state.balls.length; i += 1) {
-    if (state.balls[i].distance - state.balls[i - 1].distance < 32) {
-      state.balls[i].distance = state.balls[i - 1].distance + 32;
+    if (state.balls[i].distance - state.balls[i - 1].distance < BALL_SPACING - 2) {
+      state.balls[i].distance = state.balls[i - 1].distance + BALL_SPACING - 2;
     }
   }
 }
 
-function resolveMatches(startIndex) {
+function resolveMatches(startIndex, combo = 0) {
   const target = state.balls[startIndex];
   if (!target) return;
   let left = startIndex;
   let right = startIndex;
-  while (left > 0 && state.balls[left - 1].colorIndex === target.colorIndex) left -= 1;
-  while (right < state.balls.length - 1 && state.balls[right + 1].colorIndex === target.colorIndex) right += 1;
+  while (
+    left > 0 &&
+    state.balls[left - 1].colorIndex === target.colorIndex &&
+    state.balls[left].distance - state.balls[left - 1].distance <= MATCH_GAP
+  ) left -= 1;
+  while (
+    right < state.balls.length - 1 &&
+    state.balls[right + 1].colorIndex === target.colorIndex &&
+    state.balls[right + 1].distance - state.balls[right].distance <= MATCH_GAP
+  ) right += 1;
   const count = right - left + 1;
-  if (count < 3) return;
+  if (count < 3) {
+    if (combo === 0) state.chainBonus = 0;
+    return;
+  }
 
+  const center = state.balls[Math.floor((left + right) / 2)];
+  const centerPoint = samplePath(center.distance);
   const removed = state.balls.splice(left, count);
-  const bonus = count * count * 10 + Math.max(0, count - 3) * 25;
+  state.chainBonus = combo + 1;
+  state.maxCombo = Math.max(state.maxCombo, state.chainBonus);
+  const bonus = count * count * 10 + Math.max(0, count - 3) * 25 + combo * 120;
   state.score += bonus;
+  addFloatingText(centerPoint.x, centerPoint.y, combo ? `+${bonus} 连击 x${combo + 1}` : `+${bonus}`, target.colorIndex);
   removed.forEach((ball) => {
     if (ball.skill) state.skills[ball.skill] = Math.min(9, state.skills[ball.skill] + 1);
   });
   pullGaps(left);
+  const bridgeIndex = clamp(left, 0, state.balls.length - 1);
+  if (state.balls[bridgeIndex]) resolveMatches(bridgeIndex, combo + 1);
+  keepShooterColorsInChain();
 }
 
 function pullGaps(from) {
   for (let i = from; i < state.balls.length; i += 1) {
     const prev = state.balls[i - 1];
-    if (prev && state.balls[i].distance - prev.distance > 35) {
-      state.balls[i].distance = prev.distance + 35;
+    if (prev && state.balls[i].distance - prev.distance > BALL_SPACING + 1) {
+      state.balls[i].distance = prev.distance + BALL_SPACING + 1;
     }
   }
+}
+
+function addFloatingText(x, y, text, colorIndex) {
+  state.floaters.push({ x, y, text, colorIndex, life: 1.2 });
 }
 
 function shoot(pointer) {
@@ -521,7 +616,14 @@ function shoot(pointer) {
     skippedTracks: [],
   });
   state.currentColor = state.nextColor;
-  state.nextColor = Math.floor(Math.random() * basePalette.length);
+  state.nextColor = randomColorInBalls();
+}
+
+function swapShooterBalls() {
+  if (state.paused || state.won || state.lost) return;
+  const previous = state.currentColor;
+  state.currentColor = state.nextColor;
+  state.nextColor = previous;
 }
 
 function useSkill(skill) {
@@ -683,6 +785,11 @@ canvas.addEventListener("pointermove", (event) => {
 canvas.addEventListener("pointerdown", (event) => {
   shoot(toGamePoint(event));
 });
+canvas.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+  swapShooterBalls();
+});
+ui.nextPreview.addEventListener("click", swapShooterBalls);
 ui.pauseButton.addEventListener("click", () => {
   state.paused = !state.paused;
 });

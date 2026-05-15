@@ -183,6 +183,7 @@ input {
 #nextPreview {
   width: 42px;
   height: 42px;
+  cursor: pointer;
 }
 
 .hud-actions {
