@@ -38,9 +38,9 @@ const basePalette = [
 ];
 
 const levels = [
-  { time: 90, balls: 34, speed: 35, spawn: 0.42 },
-  { time: 105, balls: 44, speed: 42, spawn: 0.52 },
-  { time: 120, balls: 56, speed: 50, spawn: 0.62 },
+  { time: 90, balls: 34, speed: 20, spawn: 0.42 },
+  { time: 105, balls: 44, speed: 25, spawn: 0.52 },
+  { time: 120, balls: 56, speed: 30, spawn: 0.62 },
 ];
 
 const pathPoints = [
@@ -73,22 +73,39 @@ function buildPath() {
   pathSamples = [];
   pathLength = 0;
   for (let i = 0; i < pathPoints.length - 1; i += 1) {
-    const [x1, y1] = pathPoints[i];
-    const [x2, y2] = pathPoints[i + 1];
-    const dist = Math.hypot(x2 - x1, y2 - y1);
-    const steps = Math.max(4, Math.floor(dist / 5));
+    const p0 = pathPoints[Math.max(0, i - 1)];
+    const p1 = pathPoints[i];
+    const p2 = pathPoints[i + 1];
+    const p3 = pathPoints[Math.min(pathPoints.length - 1, i + 2)];
+    const chord = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+    const steps = Math.max(10, Math.floor(chord / 4));
     for (let s = 0; s < steps; s += 1) {
       const t = s / steps;
-      pathSamples.push({
-        x: x1 + (x2 - x1) * t,
-        y: y1 + (y2 - y1) * t,
-        d: pathLength + dist * t,
-      });
+      const point = catmullRom(p0, p1, p2, p3, t);
+      addPathSample(point[0], point[1]);
     }
-    pathLength += dist;
   }
   const last = pathPoints[pathPoints.length - 1];
-  pathSamples.push({ x: last[0], y: last[1], d: pathLength });
+  addPathSample(last[0], last[1]);
+}
+
+function catmullRom(p0, p1, p2, p3, t) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return [
+    0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+    0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3),
+  ];
+}
+
+function addPathSample(x, y) {
+  const previous = pathSamples[pathSamples.length - 1];
+  if (previous) {
+    const segment = Math.hypot(x - previous.x, y - previous.y);
+    if (segment < 0.5) return;
+    pathLength += segment;
+  }
+  pathSamples.push({ x, y, d: pathLength });
 }
 
 function createState(levelIndex = 0) {
@@ -136,6 +153,19 @@ function samplePath(distance) {
     else high = mid;
   }
   return pathSamples[low];
+}
+
+function findClosestPathPoint(x, y) {
+  let best = null;
+  let bestDistance = Infinity;
+  for (const sample of pathSamples) {
+    const distance = Math.hypot(sample.x - x, sample.y - y);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = sample;
+    }
+  }
+  return { ...best, gap: bestDistance };
 }
 
 function rgbString(color) {
@@ -198,7 +228,7 @@ function drawTrack() {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.beginPath();
-  pathPoints.forEach(([x, y], index) => (index ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  pathSamples.forEach(({ x, y }, index) => (index ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
   ctx.strokeStyle = "#263f37";
   ctx.lineWidth = 70;
   ctx.stroke();
@@ -362,9 +392,10 @@ function update(delta) {
   state.shots.forEach((shot) => {
     shot.x += shot.vx * delta;
     shot.y += shot.vy * delta;
+    shot.travel += Math.hypot(shot.vx * delta, shot.vy * delta);
   });
   handleShotCollisions();
-  state.shots = state.shots.filter((shot) => shot.x > -40 && shot.x < 1320 && shot.y > -40 && shot.y < 760);
+  state.shots = state.shots.filter((shot) => !shot.hit && shot.x > -40 && shot.x < 1320 && shot.y > -40 && shot.y < 760);
 
   if (state.balls.some((ball) => ball.distance >= pathLength - 8)) endGame(false);
   if (state.timeLeft <= 0) endGame(false);
@@ -378,19 +409,31 @@ function handleShotCollisions() {
       const point = samplePath(ball.distance);
       return Math.hypot(point.x - shot.x, point.y - shot.y) < 28;
     });
-    if (hitIndex === -1) continue;
-    shot.hit = true;
-    const hitBall = state.balls[hitIndex];
-    const insertDistance = hitBall.distance + (shot.x > samplePath(hitBall.distance).x ? 17 : -17);
-    state.balls.splice(hitIndex + 1, 0, {
+    if (hitIndex !== -1) {
+      const hitBall = state.balls[hitIndex];
+      insertShotAtDistance(shot, hitBall.distance + 17);
+      continue;
+    }
+
+    const closest = findClosestPathPoint(shot.x, shot.y);
+    if (shot.travel < 90 || closest.gap > 18) continue;
+    insertShotAtDistance(shot, closest.d);
+  }
+}
+
+function insertShotAtDistance(shot, distance) {
+  shot.hit = true;
+  const insertDistance = clamp(distance, 0, pathLength - 18);
+  const insertedBall = {
       colorIndex: shot.colorIndex,
       distance: insertDistance,
       radius: 15,
       skill: null,
-    });
-    normalizeChain();
-    resolveMatches(hitIndex + 1);
-  }
+  };
+  state.balls.push(insertedBall);
+  normalizeChain();
+  const insertedIndex = state.balls.indexOf(insertedBall);
+  resolveMatches(Math.max(0, insertedIndex));
 }
 
 function normalizeChain() {
@@ -439,6 +482,7 @@ function shoot(pointer) {
     vx: Math.cos(angle) * 650,
     vy: Math.sin(angle) * 650,
     colorIndex: state.currentColor,
+    travel: 0,
   });
   state.currentColor = state.nextColor;
   state.nextColor = Math.floor(Math.random() * basePalette.length);
