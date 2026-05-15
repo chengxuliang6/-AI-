@@ -155,17 +155,26 @@ function samplePath(distance) {
   return pathSamples[low];
 }
 
-function findClosestPathPoint(x, y) {
-  let best = null;
-  let bestDistance = Infinity;
+function findPathHitCandidates(x, y, maxGap = 18) {
+  const candidates = [];
   for (const sample of pathSamples) {
-    const distance = Math.hypot(sample.x - x, sample.y - y);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = sample;
-    }
+    const gap = Math.hypot(sample.x - x, sample.y - y);
+    if (gap <= maxGap) candidates.push({ ...sample, gap });
   }
-  return { ...best, gap: bestDistance };
+  candidates.sort((a, b) => a.gap - b.gap);
+  return candidates.filter((candidate, index, list) => {
+    const duplicate = list.findIndex((item) => Math.abs(item.d - candidate.d) < 70) !== index;
+    return !duplicate;
+  });
+}
+
+function hasBallNearPathDistance(distance, range = 58) {
+  if (state.balls.length === 0) return true;
+  return state.balls.some((ball) => Math.abs(ball.distance - distance) <= range);
+}
+
+function hasSkippedTrack(shot, distance) {
+  return shot.skippedTracks.some((skippedDistance) => Math.abs(skippedDistance - distance) < 80);
 }
 
 function rgbString(color) {
@@ -227,22 +236,25 @@ function drawBackground() {
 function drawTrack() {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.beginPath();
-  pathSamples.forEach(({ x, y }, index) => (index ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  beginSmoothTrackPath();
   ctx.strokeStyle = "#263f37";
   ctx.lineWidth = 70;
   ctx.stroke();
+  beginSmoothTrackPath();
   ctx.strokeStyle = "#716a4d";
   ctx.lineWidth = 54;
   ctx.stroke();
+  beginSmoothTrackPath();
   ctx.strokeStyle = "#342f25";
   ctx.lineWidth = 42;
   ctx.stroke();
+  beginSmoothTrackPath();
   ctx.strokeStyle = "#5c654f";
   ctx.lineWidth = 34;
   ctx.stroke();
 
   ctx.setLineDash([18, 20]);
+  beginSmoothTrackPath();
   ctx.strokeStyle = "rgba(26, 34, 29, 0.35)";
   ctx.lineWidth = 3;
   ctx.stroke();
@@ -257,6 +269,22 @@ function drawTrack() {
   ctx.beginPath();
   ctx.arc(end.x, end.y, 42, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function beginSmoothTrackPath() {
+  ctx.beginPath();
+  if (!pathSamples.length) return;
+  ctx.moveTo(pathSamples[0].x, pathSamples[0].y);
+  const stride = 6;
+  for (let i = stride; i < pathSamples.length - stride; i += stride) {
+    const current = pathSamples[i];
+    const next = pathSamples[Math.min(pathSamples.length - 1, i + stride)];
+    const midX = (current.x + next.x) / 2;
+    const midY = (current.y + next.y) / 2;
+    ctx.quadraticCurveTo(current.x, current.y, midX, midY);
+  }
+  const last = pathSamples[pathSamples.length - 1];
+  ctx.lineTo(last.x, last.y);
 }
 
 function drawBall(x, y, radius, color, skill = null) {
@@ -415,9 +443,16 @@ function handleShotCollisions() {
       continue;
     }
 
-    const closest = findClosestPathPoint(shot.x, shot.y);
-    if (shot.travel < 90 || closest.gap > 18) continue;
-    insertShotAtDistance(shot, closest.d);
+    if (shot.travel < 90) continue;
+    const candidates = findPathHitCandidates(shot.x, shot.y);
+    for (const candidate of candidates) {
+      if (hasSkippedTrack(shot, candidate.d)) continue;
+      if (hasBallNearPathDistance(candidate.d)) {
+        insertShotAtDistance(shot, candidate.d);
+        break;
+      }
+      shot.skippedTracks.push(candidate.d);
+    }
   }
 }
 
@@ -483,6 +518,7 @@ function shoot(pointer) {
     vy: Math.sin(angle) * 650,
     colorIndex: state.currentColor,
     travel: 0,
+    skippedTracks: [],
   });
   state.currentColor = state.nextColor;
   state.nextColor = Math.floor(Math.random() * basePalette.length);
