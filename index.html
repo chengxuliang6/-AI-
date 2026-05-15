@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Marble Temple Match</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <section class="hud top-hud" aria-label="game status">
+        <div class="hud-card">
+          <span>关卡</span>
+          <strong id="levelText">1/3</strong>
+        </div>
+        <div class="hud-card wide">
+          <span>分数</span>
+          <strong id="scoreText">0</strong>
+          <div class="stars" aria-hidden="true">
+            <i></i><i></i><i></i>
+          </div>
+        </div>
+        <div class="timer">
+          <span class="timer-icon" aria-hidden="true"></span>
+          <strong id="timerText">01:30</strong>
+          <div class="timer-bar"><i id="timerBar"></i></div>
+        </div>
+        <div class="hud-card next-card">
+          <span>下一个</span>
+          <b id="nextPreview" aria-hidden="true"></b>
+        </div>
+        <div class="hud-actions">
+          <button id="pauseButton" type="button" title="暂停或继续">暂停</button>
+          <button id="restartButton" type="button" title="重新开始">重开</button>
+        </div>
+      </section>
+
+      <canvas id="gameCanvas" width="1280" height="720" aria-label="Zuma style matching game"></canvas>
+
+      <aside class="settings-panel" aria-label="color settings">
+        <header>
+          <h1>颜色设置</h1>
+          <button id="modeToggle" type="button">RGB</button>
+        </header>
+        <div id="rgbControls" class="control-group">
+          <label>红 <input id="redRange" type="range" min="30" max="255" value="230" /></label>
+          <label>绿 <input id="greenRange" type="range" min="30" max="255" value="70" /></label>
+          <label>蓝 <input id="blueRange" type="range" min="30" max="255" value="70" /></label>
+        </div>
+        <div id="yuvControls" class="control-group hidden">
+          <label>Y <input id="yRange" type="range" min="40" max="235" value="130" /></label>
+          <label>U <input id="uRange" type="range" min="-90" max="90" value="15" /></label>
+          <label>V <input id="vRange" type="range" min="-90" max="90" value="60" /></label>
+        </div>
+        <div class="swatch-grid" id="swatches"></div>
+        <p>选择颜色后用滑杆调整当前球色板。三个及以上相同颜色自动消除。</p>
+      </aside>
+
+      <section class="skill-dock" aria-label="skill balls">
+        <button data-skill="pause" type="button">
+          <span class="skill-orb pause"></span>
+          暂停倒计时 <b id="pauseCount">3</b>
+        </button>
+        <button data-skill="rewind" type="button">
+          <span class="skill-orb rewind"></span>
+          回退队列 <b id="rewindCount">3</b>
+        </button>
+        <button data-skill="blast" type="button">
+          <span class="skill-orb blast"></span>
+          相邻消除 <b id="blastCount">3</b>
+        </button>
+      </section>
+
+      <div id="message" class="message hidden" role="status"></div>
+    </main>
+    <script src="script.js"></script>
+  </body>
+</html>

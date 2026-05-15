@@ -1,0 +1,377 @@
+:root {
+  color-scheme: dark;
+  font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+  --bg: #092f35;
+  --panel: rgba(7, 48, 54, 0.88);
+  --panel-strong: rgba(6, 37, 43, 0.96);
+  --line: rgba(123, 217, 219, 0.42);
+  --text: #f5fbf7;
+  --muted: #b7d7d4;
+  --gold: #f7b942;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(63, 171, 118, 0.3), transparent 24%),
+    radial-gradient(circle at 85% 20%, rgba(255, 186, 66, 0.18), transparent 22%),
+    linear-gradient(135deg, #06242b, #0c4947 52%, #071b22);
+  color: var(--text);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.game-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-width: 980px;
+  min-height: 620px;
+  padding: 18px;
+}
+
+#gameCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 1px solid rgba(107, 221, 223, 0.22);
+  border-radius: 8px;
+  background: #0a3638;
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.45);
+}
+
+.hud {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.top-hud {
+  top: 18px;
+  left: 22px;
+  right: 22px;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.hud-card,
+.timer,
+.hud-actions,
+.settings-panel,
+.skill-dock {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28), inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.hud-card {
+  min-width: 124px;
+  padding: 14px 18px;
+}
+
+.hud-card.wide {
+  min-width: 220px;
+}
+
+.hud-card span,
+.settings-panel label,
+.skill-dock button {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.hud-card strong,
+.timer strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.stars {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.stars i {
+  width: 18px;
+  height: 18px;
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 56%, 79% 91%, 50% 70%, 21% 91%, 32% 56%, 2% 35%, 39% 35%);
+  background: var(--gold);
+  filter: drop-shadow(0 0 6px rgba(247, 185, 66, 0.6));
+}
+
+.timer {
+  position: relative;
+  min-width: 235px;
+  padding: 14px 24px 12px 64px;
+}
+
+.timer-icon {
+  position: absolute;
+  left: 20px;
+  top: 18px;
+  width: 34px;
+  height: 34px;
+  border: 5px solid #f7fbff;
+  border-radius: 50%;
+}
+
+.timer-icon::before,
+.timer-icon::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 7px;
+  width: 4px;
+  height: 12px;
+  background: #f7fbff;
+  transform-origin: bottom;
+}
+
+.timer-icon::after {
+  height: 10px;
+  transform: rotate(90deg);
+}
+
+.timer-bar {
+  height: 5px;
+  margin-top: 9px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.timer-bar i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: #34d8ff;
+}
+
+.next-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+#nextPreview,
+.swatch,
+.skill-orb {
+  display: inline-block;
+  border-radius: 50%;
+  box-shadow: inset -7px -9px 13px rgba(0, 0, 0, 0.28), inset 5px 6px 12px rgba(255, 255, 255, 0.28), 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+
+#nextPreview {
+  width: 42px;
+  height: 42px;
+}
+
+.hud-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  pointer-events: auto;
+}
+
+.hud-actions button,
+.settings-panel button {
+  border: 1px solid rgba(166, 230, 230, 0.32);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.settings-panel {
+  position: absolute;
+  right: 28px;
+  top: 190px;
+  z-index: 5;
+  width: 260px;
+  padding: 18px;
+}
+
+.settings-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.settings-panel h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.control-group {
+  display: grid;
+  gap: 12px;
+}
+
+.control-group.hidden,
+.message.hidden {
+  display: none;
+}
+
+.control-group label {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #36c6dc;
+}
+
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin: 18px 0 12px;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.swatch.selected {
+  border-color: #fff;
+}
+
+.settings-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.skill-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  z-index: 4;
+  display: flex;
+  gap: 14px;
+  padding: 14px 18px;
+  transform: translateX(-50%);
+}
+
+.skill-dock button {
+  display: grid;
+  grid-template-columns: 46px auto 28px;
+  align-items: center;
+  gap: 10px;
+  min-width: 174px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.skill-dock b {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.skill-orb {
+  width: 44px;
+  height: 44px;
+}
+
+.skill-orb.pause {
+  background: radial-gradient(circle at 35% 28%, #fff, #2386ff 45%, #0a318f);
+}
+
+.skill-orb.rewind {
+  background: radial-gradient(circle at 35% 28%, #fff, #a94cff 45%, #452075);
+}
+
+.skill-orb.blast {
+  background: radial-gradient(circle at 35% 28%, #fff7b2, #ff5c1d 48%, #8e1600);
+}
+
+.message {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 8;
+  width: min(420px, 90vw);
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(5, 29, 35, 0.94);
+  color: var(--text);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 1100px) {
+  body {
+    overflow: auto;
+  }
+
+  .game-shell {
+    min-width: 0;
+    height: 820px;
+    padding: 10px;
+  }
+
+  .top-hud {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    flex-wrap: wrap;
+  }
+
+  .hud-card strong,
+  .timer strong {
+    font-size: 24px;
+  }
+
+  .settings-panel {
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: 96px;
+    width: auto;
+  }
+
+  .skill-dock {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    transform: none;
+    overflow-x: auto;
+  }
+}
