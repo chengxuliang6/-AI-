@@ -23,6 +23,9 @@ const ranges = {
   r: document.getElementById("redRange"),
   g: document.getElementById("greenRange"),
   b: document.getElementById("blueRange"),
+  rNum: document.getElementById("redValue"),
+  gNum: document.getElementById("greenValue"),
+  bNum: document.getElementById("blueValue"),
   y: document.getElementById("yRange"),
   u: document.getElementById("uRange"),
   v: document.getElementById("vRange"),
@@ -130,6 +133,7 @@ function createState(levelIndex = 0) {
     balls,
     shots: [],
     floaters: [],
+    explosions: [],
     shooter: { x: 640, y: 392 },
     currentColor: randomColorInBalls(balls),
     nextColor: randomColorInBalls(balls),
@@ -319,7 +323,7 @@ function beginSmoothTrackPath() {
   ctx.lineTo(last.x, last.y);
 }
 
-function drawBall(x, y, radius, color, skill = null) {
+function drawBall(x, y, radius, color, skill = null, patternIndex = 0) {
   const grad = ctx.createRadialGradient(x - radius * 0.35, y - radius * 0.45, 2, x, y, radius);
   grad.addColorStop(0, "#fff6d4");
   grad.addColorStop(0.18, rgbString(color.map((c) => clamp(c + 45, 0, 255))));
@@ -332,6 +336,7 @@ function drawBall(x, y, radius, color, skill = null) {
   ctx.strokeStyle = "rgba(255, 255, 255, 0.38)";
   ctx.lineWidth = 2;
   ctx.stroke();
+  drawBallPattern(x, y, radius, patternIndex);
 
   if (skill) {
     ctx.save();
@@ -363,6 +368,61 @@ function drawBall(x, y, radius, color, skill = null) {
   }
 }
 
+function drawBallPattern(x, y, radius, patternIndex) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius - 1, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.34)";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+  ctx.lineWidth = 2;
+  const type = patternIndex % 6;
+  if (type === 0) {
+    for (let i = -radius; i <= radius; i += 8) {
+      ctx.beginPath();
+      ctx.arc(x + i, y, radius * 0.55, -0.9, 0.9);
+      ctx.stroke();
+    }
+  } else if (type === 1) {
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * radius, y + Math.sin(a) * radius);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.42, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (type === 2) {
+    for (let i = -radius; i <= radius; i += 9) {
+      ctx.beginPath();
+      ctx.moveTo(x - radius, y + i);
+      ctx.lineTo(x + radius, y + i + radius * 0.7);
+      ctx.stroke();
+    }
+  } else if (type === 3) {
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 2) {
+      ctx.beginPath();
+      ctx.ellipse(x + Math.cos(a) * radius * 0.28, y + Math.sin(a) * radius * 0.28, radius * 0.2, radius * 0.38, a, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (type === 4) {
+    for (let i = -1; i <= 1; i += 1) {
+      ctx.beginPath();
+      ctx.arc(x, y + i * radius * 0.32, radius * 0.55, 0.15, Math.PI - 0.15);
+      ctx.stroke();
+    }
+  } else {
+    for (let i = 0; i < 6; i += 1) {
+      const a = i * Math.PI / 3;
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(a) * radius * 0.46, y + Math.sin(a) * radius * 0.46, radius * 0.14, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function drawShooter() {
   const { x, y } = state.shooter;
   const pointer = state.pointer || { x: 640, y: 160 };
@@ -370,30 +430,58 @@ function drawShooter() {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
-  ctx.fillStyle = "#ba8d34";
-  ctx.strokeStyle = "#f0c45b";
-  ctx.lineWidth = 3;
+  const barrel = ctx.createLinearGradient(8, 0, 72, 0);
+  barrel.addColorStop(0, "#5d3f19");
+  barrel.addColorStop(0.42, "#f4c667");
+  barrel.addColorStop(1, "#7adfe3");
+  ctx.fillStyle = barrel;
+  ctx.strokeStyle = "#ffdd7a";
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(16, 0);
-  ctx.lineTo(58, -11);
-  ctx.lineTo(58, 11);
+  ctx.moveTo(14, -13);
+  ctx.lineTo(68, -8);
+  ctx.quadraticCurveTo(82, 0, 68, 8);
+  ctx.lineTo(14, 13);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+  ctx.fillRect(22, -5, 40, 3);
   ctx.restore();
 
-  ctx.fillStyle = "#4d351b";
+  const baseGrad = ctx.createRadialGradient(x - 18, y - 24, 10, x, y, 58);
+  baseGrad.addColorStop(0, "#ffe29a");
+  baseGrad.addColorStop(0.38, "#9d6e2c");
+  baseGrad.addColorStop(1, "#2d1f13");
+  ctx.fillStyle = baseGrad;
   ctx.beginPath();
-  ctx.arc(x, y, 52, 0, Math.PI * 2);
+  ctx.arc(x, y, 56, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#d9a646";
-  ctx.lineWidth = 6;
+  ctx.strokeStyle = "#f3c35b";
+  ctx.lineWidth = 7;
   ctx.stroke();
-  drawBall(x, y, 24, basePalette[state.currentColor].color);
+  ctx.strokeStyle = "#d9a646";
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 12; i += 1) {
+    const a = i * Math.PI / 6;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * 38, y + Math.sin(a) * 38);
+    ctx.lineTo(x + Math.cos(a) * 53, y + Math.sin(a) * 53);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, 28, 0, Math.PI * 2);
+  ctx.fillStyle = "#153b3c";
+  ctx.fill();
+  ctx.strokeStyle = "#58dcff";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  drawBall(x, y, 24, basePalette[state.currentColor].color, null, state.currentColor);
+  drawBall(x - Math.cos(angle) * 42, y - Math.sin(angle) * 42, 12, basePalette[state.nextColor].color, null, state.nextColor);
 }
 
 function drawShots() {
-  state.shots.forEach((shot) => drawBall(shot.x, shot.y, 14, basePalette[shot.colorIndex].color));
+  state.shots.forEach((shot) => drawBall(shot.x, shot.y, 14, basePalette[shot.colorIndex].color, null, shot.colorIndex));
 }
 
 function drawFloaters() {
@@ -411,11 +499,38 @@ function drawFloaters() {
   ctx.globalAlpha = 1;
 }
 
+function drawExplosions() {
+  state.explosions.forEach((explosion) => {
+    const age = 1 - explosion.life / explosion.maxLife;
+    const alpha = clamp(explosion.life / explosion.maxLife, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.42;
+    ctx.strokeStyle = rgbString(explosion.color);
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(explosion.x, explosion.y, 18 + age * 36, 0, Math.PI * 2);
+    ctx.stroke();
+    explosion.trails.forEach((trail) => {
+      ctx.globalAlpha = alpha * trail.alpha;
+      drawBall(trail.x, trail.y, trail.r, explosion.color, null, explosion.patternIndex);
+    });
+    explosion.particles.forEach((particle) => {
+      ctx.globalAlpha = alpha * particle.alpha;
+      ctx.fillStyle = rgbString(explosion.color.map((c) => clamp(c + 35, 0, 255)));
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  });
+}
+
 function drawChain() {
   const ordered = [...state.balls].sort((a, b) => b.distance - a.distance);
   ordered.forEach((ball) => {
     const point = samplePath(ball.distance);
-    drawBall(point.x, point.y, ball.radius, basePalette[ball.colorIndex].color, ball.skill);
+    drawBall(point.x, point.y, ball.radius, basePalette[ball.colorIndex].color, ball.skill, ball.colorIndex);
   });
 }
 
@@ -438,6 +553,7 @@ function draw() {
   drawTrack();
   drawAim();
   drawChain();
+  drawExplosions();
   drawShots();
   drawFloaters();
   drawShooter();
@@ -464,6 +580,19 @@ function update(delta) {
   if (state.timerFrozen > 0) state.timerFrozen -= delta;
   else state.timeLeft -= delta;
   if (state.rewindActive > 0) state.rewindActive -= delta;
+  state.explosions.forEach((explosion) => {
+    explosion.life -= delta;
+    explosion.particles.forEach((particle) => {
+      particle.x += particle.vx * delta;
+      particle.y += particle.vy * delta;
+      particle.vy += 70 * delta;
+    });
+    explosion.trails.forEach((trail) => {
+      trail.r += 8 * delta;
+      trail.alpha -= 0.8 * delta;
+    });
+  });
+  state.explosions = state.explosions.filter((explosion) => explosion.life > 0);
   state.floaters.forEach((floater) => {
     floater.y -= 28 * delta;
     floater.life -= delta;
@@ -580,6 +709,10 @@ function resolveMatches(startIndex, combo = 0) {
   state.maxCombo = Math.max(state.maxCombo, state.chainBonus);
   const bonus = count * count * 10 + Math.max(0, count - 3) * 25 + combo * 120;
   state.score += bonus;
+  removed.forEach((ball, offset) => {
+    const point = samplePath(ball.distance);
+    createExplosion(point.x, point.y, basePalette[ball.colorIndex].color, ball.colorIndex, offset);
+  });
   addFloatingText(centerPoint.x, centerPoint.y, combo ? `+${bonus} 连击 x${combo + 1}` : `+${bonus}`, target.colorIndex);
   removed.forEach((ball) => {
     if (ball.skill) state.skills[ball.skill] = Math.min(9, state.skills[ball.skill] + 1);
@@ -601,6 +734,32 @@ function pullGaps(from) {
 
 function addFloatingText(x, y, text, colorIndex) {
   state.floaters.push({ x, y, text, colorIndex, life: 1.2 });
+}
+
+function createExplosion(x, y, color, patternIndex, seed = 0) {
+  const particles = [];
+  const trails = [];
+  for (let i = 0; i < 12; i += 1) {
+    const angle = i * Math.PI * 2 / 12 + seed * 0.18;
+    const speed = 90 + (i % 4) * 22;
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: 2.2 + (i % 3),
+      alpha: 0.85,
+    });
+  }
+  for (let i = 0; i < 4; i += 1) {
+    trails.push({
+      x: x - i * 4,
+      y: y + i * 2,
+      r: 15 - i * 2,
+      alpha: 0.32 - i * 0.06,
+    });
+  }
+  state.explosions.push({ x, y, color, patternIndex, particles, trails, life: 0.72, maxLife: 0.72 });
 }
 
 function shoot(pointer) {
@@ -731,6 +890,9 @@ function syncRangesFromColor() {
   ranges.r.value = color[0];
   ranges.g.value = color[1];
   ranges.b.value = color[2];
+  ranges.rNum.value = color[0];
+  ranges.gNum.value = color[1];
+  ranges.bNum.value = color[2];
   const [y, u, v] = rgbToYuv(color);
   ranges.y.value = y;
   ranges.u.value = clamp(u, -90, 90);
@@ -739,6 +901,9 @@ function syncRangesFromColor() {
 
 function applyColorFromRanges() {
   if (editMode === "RGB") {
+    syncRgbPair(ranges.r, ranges.rNum);
+    syncRgbPair(ranges.g, ranges.gNum);
+    syncRgbPair(ranges.b, ranges.bNum);
     basePalette[selectedColor].color = [
       Number(ranges.r.value),
       Number(ranges.g.value),
@@ -752,6 +917,13 @@ function applyColorFromRanges() {
     );
   }
   updateSwatches();
+}
+
+function syncRgbPair(range, numberInput) {
+  const active = document.activeElement === numberInput ? numberInput : range;
+  const value = clamp(Number(active.value) || 0, 30, 255);
+  range.value = value;
+  numberInput.value = value;
 }
 
 function toGamePoint(event) {

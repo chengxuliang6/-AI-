@@ -237,7 +237,7 @@ input {
 
 .control-group label {
   display: grid;
-  grid-template-columns: 34px 1fr;
+  grid-template-columns: 34px 1fr 58px;
   align-items: center;
   gap: 12px;
 }
@@ -245,6 +245,22 @@ input {
 input[type="range"] {
   width: 100%;
   accent-color: #36c6dc;
+}
+
+input[type="number"] {
+  width: 58px;
+  height: 30px;
+  border: 1px solid rgba(166, 230, 230, 0.32);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#yuvControls label {
+  grid-template-columns: 34px 1fr;
 }
 
 .swatch-grid {
